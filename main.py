@@ -166,7 +166,7 @@ class Tetra:
                                                np.linalg.norm(original_vertices[2] - original_vertices[3]),
                                                np.linalg.norm(original_vertices[0] - original_vertices[3])])
                     face_index = list(combinations(np.arange(amino_count * 4, (amino_count + 1) * 4), 3))
-                    self.va.extend(vertices)
+                    self.va.append(vertices)
                     self.ta.extend(face_index)
                     c_alpha_vertex.append(c_alpha_cord)
                     all_original_vertex.extend(original_vertices)
@@ -187,17 +187,24 @@ class Tetra:
 
         self.avg_length(model_ids, chain_ids)
         self.provide_model(model_ids, chain_ids, reg)
-        self.t.set_geometry(self.va, self.va, self.ta)
+
+        va = np.reshape(self.va, (self.va.shape[0] * self.va.shape[1], self.va.shape[2]))
+        self.t.set_geometry(va, va, self.ta)
 
         self.t.vertex_colors = self.model_list[0].atoms.colors
         m0 = Model('m0', self.session)
         m0.add([self.t])
         self.session.models.add([m0])
 
-    def massing(self, refinement=3):
+    def massing(self, seq=False, refinement=2):
+
         v = []
-        for model in self.model_list:
-            v.extend(model.atoms.coords)
+        if seq:
+            v.extend(self.model_list[seq[0]].residues[seq[1]: seq[2]].atoms.coords)
+        else:
+            seq = (0, 0, len(self.va) - 1)
+            for model in self.model_list:
+                v.extend(model.atoms.coords)
 
         mesh = alphashape.alphashape(v, refinement * 0.1)
         inside = trimesh.proximity.ProximityQuery(mesh).signed_distance
@@ -208,11 +215,11 @@ class Tetra:
         q = []
 
         # Create the first tetrahedron
-        self.avg_edge_length *= 0.8
-        pt1 = self.va[0]
-        pt2 = self.va[0] + (self.va[1] - self.va[0]) * self.avg_edge_length / np.linalg.norm(self.va[1] - self.va[0])
-        pt3 = self.va[0] + (self.va[2] - self.va[0]) * self.avg_edge_length / np.linalg.norm(self.va[2] - self.va[0])
-        pt4 = self.va[0] + (self.va[3] - self.va[0]) * self.avg_edge_length / np.linalg.norm(self.va[3] - self.va[0])
+        self.avg_edge_length *= 0.9999
+        pt1 = self.va[seq[1]][0]
+        pt2 = self.va[seq[1]][0] + (self.va[seq[1]][1] - self.va[seq[1]][0]) * self.avg_edge_length / np.linalg.norm(self.va[seq[1]][1] - self.va[seq[1]][0])
+        pt3 = self.va[seq[1]][0] + (self.va[seq[1]][2] - self.va[seq[1]][0]) * self.avg_edge_length / np.linalg.norm(self.va[seq[1]][2] - self.va[seq[1]][0])
+        pt4 = self.va[seq[1]][0] + (self.va[seq[1]][3] - self.va[seq[1]][0]) * self.avg_edge_length / np.linalg.norm(self.va[seq[1]][3] - self.va[seq[1]][0])
 
         print(pt1, pt2, pt3, pt4)
         self.massing_vertices.extend([pt1, pt2, pt3, pt4])
@@ -277,7 +284,8 @@ class Tetra:
 
         t = Drawing("t")
         t.set_geometry(self.massing_vertices, self.massing_vertices, faces)
+        t.vertex_colors = np.array([[210, 140, 27, 225] for i in range(len(self.massing_vertices))], dtype=np.int8)
 
-        m0 = Model('m1', self.session)
-        m0.add([t])
-        self.session.models.add([m0])
+        m1 = Model('m1', self.session)
+        m1.add([t])
+        self.session.models.add([m1])
